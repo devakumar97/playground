@@ -40,6 +40,15 @@ import { type Theme, getTheme } from './utils/theme.server.ts'
 import { makeTimings, time } from './utils/timing.server.ts'
 import { getToast } from './utils/toast.server.ts'
 import { useOptionalUser } from './utils/user.ts'
+import { useChangeLanguage } from "remix-i18next/react";
+import {
+  getLocale,
+  i18nextMiddleware,
+  localeCookie,
+} from "#app/utils/i18n.server.ts";
+import { useTranslation } from "react-i18next";
+
+export const unstable_middleware = [i18nextMiddleware];
 
 export const links: Route.LinksFunction = () => {
 	return [
@@ -75,7 +84,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 		type: 'getUserId',
 		desc: 'getUserId in root',
 	})
-
+	let locale = getLocale(request);
 	const user = userId
 		? await time(
 				() =>
@@ -93,6 +102,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 									},
 								},
 							},
+							
 						},
 						where: { id: userId },
 					}),
@@ -122,10 +132,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 			ENV: getEnv(),
 			toast,
 			honeyProps,
+			locale
 		},
 		{
 			headers: combineHeaders(
 				{ 'Server-Timing': timings.toString() },
+				{ "Set-Cookie": await localeCookie.serialize(locale) },
 				toastHeaders,
 			),
 		},
@@ -138,16 +150,18 @@ function Document({
 	children,
 	nonce,
 	theme = 'light',
+	locale = 'en', 
 	env = {},
 }: {
 	children: React.ReactNode
 	nonce: string
 	theme?: Theme
+	locale?:string
 	env?: Record<string, string | undefined>
 }) {
 	const allowIndexing = ENV.ALLOW_INDEXING !== 'false'
 	return (
-		<html lang="en" className={`${theme} h-full overflow-x-hidden`}>
+		<html lang={locale} className={`${theme} h-full overflow-x-hidden`}>
 			<head>
 				<ClientHintCheck nonce={nonce} />
 				<Meta />
@@ -193,7 +207,7 @@ function App() {
 	const isOnSearchPage = matches.find((m) => m.id === 'routes/users+/index')
 	const searchBar = isOnSearchPage ? null : <SearchBar status="idle" />
 	useToast(data.toast)
-
+	useChangeLanguage();
 	return (
 		<OpenImgContextProvider
 			optimizerEndpoint="/resources/images"
